@@ -263,6 +263,8 @@ const
 begin
   GetMemoryManager(OriginMM);
   HookMM := C_;
+  HookMM.RegisterExpectedMemoryLeak := OriginMM.RegisterExpectedMemoryLeak;
+  HookMM.UnregisterExpectedMemoryLeak := OriginMM.UnregisterExpectedMemoryLeak;
   SetMemoryManager(HookMM);
 end;
 
