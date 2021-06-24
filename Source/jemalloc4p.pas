@@ -247,6 +247,16 @@ begin
   Fast_FillByte(Result, Size, 0);
 end;
 
+function do_RegisterExpectedMemoryLeak(P: Pointer): Boolean;
+begin
+  Result := False;
+end;
+
+function do_UnregisterExpectedMemoryLeak(P: Pointer): Boolean;
+begin
+  Result := False;
+end;
+
 procedure InstallMemoryHook;
 const
   C_: TMemoryManagerEx =
@@ -257,14 +267,12 @@ const
     ReallocMem: do_ReallocMem;
     { Extended (optional) functionality. }
     AllocMem: do_AllocMem;
-    RegisterExpectedMemoryLeak: nil;
-    UnregisterExpectedMemoryLeak: nil;
+    RegisterExpectedMemoryLeak: do_RegisterExpectedMemoryLeak;
+    UnregisterExpectedMemoryLeak: do_UnregisterExpectedMemoryLeak;
   );
 begin
   GetMemoryManager(OriginMM);
   HookMM := C_;
-  HookMM.RegisterExpectedMemoryLeak := OriginMM.RegisterExpectedMemoryLeak;
-  HookMM.UnregisterExpectedMemoryLeak := OriginMM.UnregisterExpectedMemoryLeak;
   SetMemoryManager(HookMM);
 end;
 
