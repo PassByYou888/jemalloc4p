@@ -33,13 +33,13 @@ const
 {$ELSEIF Defined(WIN64)}
   jemalloc4p_Lib = 'jemalloc_X64.dll';
 {$ELSEIF Defined(OSX)}
-  jemalloc4p_Lib = 'libjemalloc.2.dylib';
+  jemalloc4p_Lib = 'libjemalloc.dylib';
 {$ELSEIF Defined(IOS)}
   jemalloc4p_Lib = 'libjemalloc.a';
 {$ELSEIF Defined(ANDROID)}
-  jemalloc4p_Lib = 'libjemalloc.so.2';
+  jemalloc4p_Lib = 'libjemalloc.so';
 {$ELSEIF Defined(Linux)}
-  jemalloc4p_Lib = 'libjemalloc.so.2';
+  jemalloc4p_Lib = 'libjemalloc.so';
 {$ELSE}
 {$MESSAGE FATAL 'unknow system.'}
 {$IFEND}
@@ -82,51 +82,134 @@ end;
 
 {$IFDEF FPC}
 
+(*
+  Pointer math is simply treating any given typed pointer in some narrow,
+  instances as a scaled ordinal where you can perform simple arithmetic operations directly on the pointer variable.
+*)
+{$POINTERMATH ON}
+
 
 var
   OriginMM: TMemoryManager;
   HookMM: TMemoryManager;
 
-function do_GetMem(Size: ptruint): Pointer;
+function do_GetMem(Size: PtrUInt): Pointer;
 begin
-  Result := je_malloc(Size);
+  Result := je_malloc(Size + SizeOf(PtrUInt));
+
+  if (Result <> nil) then
+    begin
+      PPtrUInt(Result)^ := Size;
+      Inc(Result, SizeOf(PtrUInt));
+    end;
 end;
 
-function do_FreeMem(P: Pointer): ptruint;
+function do_FreeMem(P: Pointer): PtrUInt;
 begin
+  if (P <> nil) then
+      Dec(P, SizeOf(PtrUInt));
+
   je_free(P);
   Result := 0;
 end;
 
-function do_FreememSize(P: Pointer; Size: ptruint): ptruint;
+function do_FreememSize(P: Pointer; Size: PtrUInt): PtrUInt;
 begin
-  je_free(P);
   Result := 0;
+  if Size = 0 then
+      Exit;
+
+  if P <> nil then
+    begin
+      Dec(P, SizeOf(PtrUInt));
+      je_free(P);
+    end;
 end;
 
-function do_AllocMem(Size: ptruint): Pointer;
+function do_AllocMem(Size: PtrUInt): Pointer;
+var
+  TotalSize: PtrUInt;
 begin
-  Result := je_malloc(Size);
-  Fast_FillByte(Result, Size, 0);
+  TotalSize := Size + SizeOf(PtrUInt);
+
+  Result := je_malloc(TotalSize);
+
+  if Result <> nil then
+    begin
+      Fast_FillByte(Result, TotalSize, 0);
+      PPtrUInt(Result)^ := Size;
+      Inc(Result, SizeOf(PtrUInt));
+    end;
 end;
 
-function do_ReallocMem(var P: Pointer; Size: ptruint): Pointer;
+function do_ReallocMem(var P: Pointer; Size: PtrUInt): Pointer;
 begin
-  P := je_realloc(P, Size);
+  if Size = 0 then
+    begin
+      if P <> nil then
+        begin
+          Dec(P, SizeOf(PtrUInt));
+
+          je_free(P);
+          P := nil;
+        end;
+    end
+  else
+    begin
+      Inc(Size, SizeOf(PtrUInt));
+      if P = nil then
+          P := je_malloc(Size)
+      else
+        begin
+          Dec(P, SizeOf(PtrUInt));
+          P := je_realloc(P, Size);
+        end;
+
+      if P <> nil then
+        begin
+          PPtrUInt(P)^ := Size - SizeOf(PtrUInt);
+          Inc(P, SizeOf(PtrUInt));
+        end;
+    end;
+
   Result := P;
 end;
 
+function do_MemSize(P: Pointer): PtrUInt;
+begin
+  Result := PPtrUInt(P - SizeOf(PtrUInt))^;
+end;
+
+function do_GetHeapStatus: THeapStatus;
+begin
+  Fast_FillByte(@Result, SizeOf(Result), 0);
+end;
+
+function do_GetFPCHeapStatus: TFPCHeapStatus;
+begin
+  Fast_FillByte(@Result, SizeOf(Result), 0);
+end;
+
 procedure InstallMemoryHook;
+const
+  C_: TMemoryManager =
+    (
+    NeedLock: False;
+    GetMem: @do_GetMem;
+    FreeMem: @do_FreeMem;
+    FreeMemSize: @do_FreememSize;
+    AllocMem: @do_AllocMem;
+    ReallocMem: @do_ReallocMem;
+    MemSize: @do_MemSize;
+    InitThread: nil;
+    DoneThread: nil;
+    RelocateHeap: nil;
+    GetHeapStatus: @do_GetHeapStatus;
+    GetFPCHeapStatus: @do_GetFPCHeapStatus;
+  );
 begin
   GetMemoryManager(OriginMM);
-  HookMM := OriginMM;
-
-  HookMM.GetMem := @do_GetMem;
-  HookMM.FreeMem := @do_FreeMem;
-  HookMM.FreememSize := @do_FreememSize;
-  HookMM.AllocMem := @do_AllocMem;
-  HookMM.ReallocMem := @do_ReallocMem;
-
+  HookMM := C_;
   SetMemoryManager(HookMM);
 end;
 
@@ -165,15 +248,21 @@ begin
 end;
 
 procedure InstallMemoryHook;
+const
+  C_: TMemoryManagerEx =
+    (
+    { The basic (required) memory manager functionality }
+    GetMem: do_GetMem;
+    FreeMem: do_FreeMem;
+    ReallocMem: do_ReallocMem;
+    { Extended (optional) functionality. }
+    AllocMem: do_AllocMem;
+    RegisterExpectedMemoryLeak: nil;
+    UnregisterExpectedMemoryLeak: nil;
+  );
 begin
   GetMemoryManager(OriginMM);
-  HookMM := OriginMM;
-
-  HookMM.GetMem := do_GetMem;
-  HookMM.FreeMem := do_FreeMem;
-  HookMM.ReallocMem := do_ReallocMem;
-  HookMM.AllocMem := do_AllocMem;
-
+  HookMM := C_;
   SetMemoryManager(HookMM);
 end;
 
