@@ -21,6 +21,19 @@ unit jemalloc4p;
 
 {$IFDEF FPC}
 {$MODE objfpc}
+{$NOTES OFF}
+{$STACKFRAMES OFF}
+{$COPERATORS OFF}
+{$GOTO OFF}
+{$INLINE ON}
+{$MACRO ON}
+{$HINTS ON}
+{$IEEEERRORS ON}
+{$R-}
+{$I-}
+{$S-}
+{$D-}
+{$OPTIMIZATION ON}
 {$ENDIF FPC}
 
 interface
@@ -30,23 +43,29 @@ implementation
 const
 {$IF Defined(WIN32)}
   jemalloc4p_Lib = 'jemalloc_IA32.dll';
+  C_FuncPre = 'je_';
 {$ELSEIF Defined(WIN64)}
   jemalloc4p_Lib = 'jemalloc_X64.dll';
+  C_FuncPre = 'je_';
 {$ELSEIF Defined(OSX)}
   jemalloc4p_Lib = 'libjemalloc.dylib';
+  C_FuncPre = '_je_';
 {$ELSEIF Defined(IOS)}
   jemalloc4p_Lib = 'libjemalloc.a';
+  C_FuncPre = '_je_';
 {$ELSEIF Defined(ANDROID)}
   jemalloc4p_Lib = 'libjemalloc.so';
+  C_FuncPre = 'je_';
 {$ELSEIF Defined(Linux)}
   jemalloc4p_Lib = 'libjemalloc.so';
+  C_FuncPre = '';
 {$ELSE}
 {$MESSAGE FATAL 'unknow system.'}
 {$IFEND}
 
-function je_malloc(Size: NativeUInt): Pointer; cdecl; external jemalloc4p_Lib Name 'je_malloc';
-procedure je_free(P: Pointer); cdecl; external jemalloc4p_Lib Name 'je_free';
-function je_realloc(P: Pointer; Size: NativeUInt): Pointer; cdecl; external jemalloc4p_Lib Name 'je_realloc';
+function je_malloc(Size: NativeUInt): Pointer; cdecl; external jemalloc4p_Lib Name C_FuncPre + 'malloc';
+procedure je_free(P: Pointer); cdecl; external jemalloc4p_Lib Name C_FuncPre + 'free';
+function je_realloc(P: Pointer; Size: NativeUInt): Pointer; cdecl; external jemalloc4p_Lib Name C_FuncPre + 'realloc';
 
 procedure Fast_FillByte(const dest: Pointer; Count: NativeUInt; const Value: byte); inline;
 var
@@ -261,11 +280,9 @@ procedure InstallMemoryHook;
 const
   C_: TMemoryManagerEx =
     (
-    { The basic (required) memory manager functionality }
     GetMem: do_GetMem;
     FreeMem: do_FreeMem;
     ReallocMem: do_ReallocMem;
-    { Extended (optional) functionality. }
     AllocMem: do_AllocMem;
     RegisterExpectedMemoryLeak: do_RegisterExpectedMemoryLeak;
     UnregisterExpectedMemoryLeak: do_UnregisterExpectedMemoryLeak;
