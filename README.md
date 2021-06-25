@@ -44,7 +44,7 @@ jemalloc for delphi/fpc compatible(win/linux/ros)
 ### Linux 编译后才能用
 
 - linux编译会根据系统自动生成,树莓派4p大概2分钟左右完成
-- 编译后把**libjemalloc.so.2**考到工程目录即可使用
+- 编译后把**libjemalloc.so**考到工程目录即可使用
 - **ZServer4D**如果用fpc在linux跑,上了jemalloc4p,不会再出现收发速度慢的问题
 - 使用**ZServer4D**开发IOT板子,jemalloc4p是必备库,不多解释
 
@@ -64,9 +64,10 @@ make install
 
 ```batch
 $ git clone https://github.com/jemalloc/jemalloc
-$ autoconf
+$ cd jemalloc
+$ ./autoconf
 $ ./configure
-$ make
+$ make -j2
 $ make install
 ```
 
