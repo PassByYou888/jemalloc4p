@@ -56,7 +56,7 @@ cd jemalloc
 ./autoconf
 ./configure
 make -j4
-make install
+sudo make install PREFIX=/usr/lib
 ```
 
 ### OSX and IOS 编译后才能用
