@@ -50,6 +50,8 @@ jemalloc for delphi/fpc compatible(win/linux/ros)
 	- 在工程引入jemalloc4p.pas后编译,如果发现undefined refence xxx这类东西,需要修改一下导出符号
 + **ZServer4D**如果用fpc在linux跑,上了jemalloc4p,不会再出现收发速度慢的问题
 - 使用**ZServer4D**开发IOT板子,jemalloc4p是必备库,不多解释
+- ubuntu这类linux如果是裸系统需要提前部署一些东西，sudo apt-get install autoconf automake libtool
+- debian系统可以直接编译安装
 
 ```batch
 git clone https://github.com/jemalloc/jemalloc
